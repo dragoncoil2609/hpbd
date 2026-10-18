@@ -9,7 +9,7 @@ Mọi nội dung nằm trong [`config.js`](config.js):
 - `title`, `subtitle`: tiêu đề và dòng chữ ở màn hình mở đầu
 - `photos`: bỏ ảnh vào thư mục `images/` rồi khai báo, ví dụ `["images/1.jpg", "images/2.jpg"]`. Để trống thì web dùng ảnh minh hoạ.
 - `wishes`: danh sách lời chúc. Ảnh thứ i khi mở to sẽ hiện lời chúc thứ i.
-- `music`: đường dẫn file nhạc, ví dụ `"music/song.mp3"` (tuỳ chọn)
+- `music`: `"builtin"` là bản Happy Birthday hộp nhạc tự phát bằng trình duyệt (mặc định), hoặc đường dẫn file nhạc riêng như `"music/song.mp3"`, hoặc `""` để tắt nhạc
 
 ## Điều khiển
 

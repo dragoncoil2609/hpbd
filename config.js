@@ -9,7 +9,7 @@ export default {
   // Danh sách ảnh. Bỏ ảnh vào thư mục images/ rồi ghi tên file vào đây, ví dụ:
   //   photos: ["images/1.jpg", "images/2.jpg", "images/3.png"],
   // Để trống [] thì web dùng ảnh minh hoạ tự vẽ.
-  photos: Array.from({ length: 19 }, (_, i) => `images/${i + 1}.jpg`),
+  photos: Array.from({ length: 25 }, (_, i) => `images/${i + 1}.jpg`),
 
   // Số ảnh minh hoạ khi chưa có ảnh thật
   placeholderCount: 24,
@@ -28,6 +28,12 @@ export default {
     "Anh yêu em nhiều lắm ♡",
   ],
 
-  // Nhạc nền (tuỳ chọn): bỏ file vào thư mục music/ rồi ghi đường dẫn, ví dụ "music/song.mp3"
-  music: "",
+  // Nhạc nền:
+  //   "builtin"          bản Happy Birthday hộp nhạc ngọt ngào, tự phát bằng trình duyệt (không cần file)
+  //   "music/song.mp3"   dùng file nhạc riêng (bỏ file vào thư mục music/)
+  //   ""                 tắt nhạc
+  music: "music/cho-chut.mp3",
+
+  // Giây bắt đầu phát bài hát (ví dụ 45 để vào thẳng điệp khúc)
+  musicStart: 0,
 };

@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import CONFIG from './config.js';
 import { HandController } from './hands.js';
+import { BirthdaySong } from './music.js';
 
 const $ = (s) => document.querySelector(s);
 const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -26,8 +27,10 @@ const GALAXY_R = 24;
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('#scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.5 : 2));
+// the scene is drawn into the composer's render targets, so canvas MSAA would be wasted work
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+const MAX_PR = Math.min(devicePixelRatio, isMobile ? 1.5 : 1.75);
+renderer.setPixelRatio(MAX_PR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.setClearColor(0x000000);
 
@@ -48,11 +51,20 @@ controls.minDistance = 6;
 controls.maxDistance = 70;
 controls.rotateSpeed = 0.6;
 
-const composer = new EffectComposer(renderer);
+// MSAA only where pixels are big enough for jaggies to show
+const composer = new EffectComposer(
+  renderer,
+  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: MAX_PR > 1.25 ? 0 : 4 })
+);
+composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.35, 0.9);
+// bloom is a blur anyway: half resolution looks the same and costs a quarter
+const bloomSetSize = bloom.setSize.bind(bloom);
+bloom.setSize = (w, h) => bloomSetSize(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 2)));
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
+composer.setSize(innerWidth, innerHeight);
 
 const world = new THREE.Group();
 scene.add(world);
@@ -131,7 +143,9 @@ function makePhotoTexture(src, i, onAspect) {
 
   if (src) {
     const img = new Image();
-    img.onload = () => {
+    img.src = src;
+    // decode() works off the main thread, so big photos don't stall the animation
+    img.decode().then(() => {
       // keep the photo's own shape (within limits) instead of a square crop
       const a = clamp(img.width / img.height, 0.62, 1.6);
       const L = 640;
@@ -144,9 +158,7 @@ function makePhotoTexture(src, i, onAspect) {
         g.drawImage(img, o + (w - iw) / 2, o + (h - ih) / 2, iw, ih);
       });
       onAspect?.(c.width / c.height);
-    };
-    img.onerror = () => console.warn('Không tải được ảnh:', src);
-    img.src = src;
+    }, () => console.warn('Không tải được ảnh:', src));
   }
   return { tex, canvas: c };
 }
@@ -193,6 +205,7 @@ function makeTextTexture(text) {
 }
 
 // ---------------------------------------------------------------- background stars
+let stars;
 {
   const n = 4000;
   const pos = new Float32Array(n * 3);
@@ -207,11 +220,10 @@ function makeTextTexture(text) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const stars = new THREE.Points(
+  stars = new THREE.Points(
     geo,
     new THREE.PointsMaterial({ size: 1.6, map: dotTex, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
   );
-  stars.name = 'stars';
   scene.add(stars);
 }
 
@@ -246,7 +258,7 @@ const galaxyMat = new THREE.ShaderMaterial({
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       gl_Position = projectionMatrix * mv;
       vTw = 0.65 + 0.35 * sin(uTime * (1.5 + aSeed * 2.0) + aSeed * 40.0);
-      gl_PointSize = min(aSize * uScale * vTw / -mv.z, 64.0);
+      gl_PointSize = min(aSize * uScale * vTw / -mv.z, 40.0 * uScale / 95.0);
       vColor = aColor;
     }
   `,
@@ -462,16 +474,42 @@ function setExpand(v) {
   $('#btn-toggle').textContent = v > 0.5 ? '💫 Thu về' : '🌌 Bung thiên hà';
 }
 
-let audio = null;
-if (CONFIG.music) {
-  audio = new Audio(CONFIG.music);
-  audio.loop = true;
-  audio.volume = 0.6;
+// music: "builtin" = the synthesized birthday song, a path = an audio file, "" = silence
+function filePlayer(src, startAt = 0) {
+  const a = new Audio(src);
+  a.loop = true;
+  a.volume = 0.6;
+  a.preload = 'auto';
+  a.onerror = () => {
+    // missing file: hide the button rather than show one that does nothing
+    console.warn('Không tải được nhạc:', src);
+    $('#btn-music').classList.add('hidden');
+  };
+  let first = true;
+  return {
+    play() {
+      if (first && startAt) a.currentTime = startAt;
+      first = false;
+      return a.play();
+    },
+    pause: () => a.pause(),
+    get playing() { return !a.paused; },
+  };
+}
+const music = CONFIG.music === 'builtin' ? new BirthdaySong() : CONFIG.music ? filePlayer(CONFIG.music, CONFIG.musicStart) : null;
+function playMusic() {
+  // called inside a click handler, which browsers require before audio may start
+  Promise.resolve(music.play())
+    .then(() => $('#btn-music').classList.add('active'))
+    .catch(() => $('#btn-music').classList.remove('active'));
+}
+if (music) {
   $('#btn-music').classList.remove('hidden');
   $('#btn-music').onclick = () => {
-    if (audio.paused) audio.play().catch(() => {});
-    else audio.pause();
-    $('#btn-music').classList.toggle('active', !audio.paused);
+    if (music.playing) {
+      music.pause();
+      $('#btn-music').classList.remove('active');
+    } else playMusic();
   };
 }
 
@@ -482,7 +520,7 @@ function start(withHands) {
   setTimeout(() => $('#intro').classList.add('hidden'), 800);
   $('#hud-title').classList.remove('hidden');
   $('#controls').classList.remove('hidden');
-  if (audio) audio.play().then(() => $('#btn-music').classList.add('active')).catch(() => {});
+  if (music) playMusic();
   if (withHands) startHands();
   else setTimeout(() => setExpand(1), 1200);
 }
@@ -589,11 +627,14 @@ const GESTURE_TEXT = {
   none: 'Đưa tay vào khung hình',
 };
 const fingerEl = $('#finger');
+let lastLabel = '';
+const fingerPos = { x: 0, y: 0 };
 
 function applyHands(now, dt) {
   if (!hands.running) return;
   const h = hands.update(now);
-  $('#gesture-label').textContent = GESTURE_TEXT[h.gesture] || '';
+  const label = GESTURE_TEXT[h.gesture] || '';
+  if (label !== lastLabel) $('#gesture-label').textContent = lastLabel = label; // avoid a DOM write every frame
 
   if (!h.present) {
     state.handBase = null;
@@ -615,8 +656,12 @@ function applyHands(now, dt) {
 
   if (h.gesture === 'point') {
     // finger cursor -> hold over a photo to open it
-    const sx = clamp((h.tip.x - 0.15) / 0.7, 0, 1) * innerWidth;
-    const sy = clamp((h.tip.y - 0.12) / 0.6, 0, 1) * innerHeight;
+    const tx = clamp((h.tip.x - 0.15) / 0.7, 0, 1) * innerWidth;
+    const ty = clamp((h.tip.y - 0.12) / 0.6, 0, 1) * innerHeight;
+    // detections arrive at ~25 Hz: glide the cursor between them
+    const fresh = fingerEl.classList.contains('hidden');
+    const sx = (fingerPos.x = fresh ? tx : damp(fingerPos.x, tx, 18, dt));
+    const sy = (fingerPos.y = fresh ? ty : damp(fingerPos.y, ty, 18, dt));
     fingerEl.classList.remove('hidden');
     fingerEl.style.transform = `translate(${sx}px, ${sy}px)`;
     const hit = pick(sx, sy);
@@ -713,18 +758,38 @@ function tick() {
     s.material.opacity = 0.75 + 0.25 * Math.sin(t * 1.2 + u.seed);
   }
 
-  scene.getObjectByName('stars').rotation.y += dt * 0.004;
+  stars.rotation.y += dt * 0.004;
 
   controls.update();
   composer.render();
+  adaptQuality(now);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+
+// Drop the render resolution step by step while the GPU can't hold ~50 fps.
+const perf = { last: 0, frames: 0, slow: 0, since: performance.now() + 3000 };
+function adaptQuality(now) {
+  const ft = now - perf.last;
+  perf.last = now;
+  if (now < perf.since || ft > 200 || document.hidden) return; // startup, tab switches
+  perf.frames++;
+  if (ft > 20) perf.slow++;
+  if (perf.frames < 90) return;
+  const pr = renderer.getPixelRatio();
+  if (perf.slow / perf.frames > 0.25 && pr > 1) setPixelRatio(Math.max(1, pr - 0.25));
+  perf.frames = perf.slow = 0;
+}
+function setPixelRatio(pr) {
+  renderer.setPixelRatio(pr);
+  composer.setPixelRatio(pr);
+  galaxyMat.uniforms.uScale.value = pr * 95;
+  perf.since = performance.now() + 1500; // let the new size settle before judging again
+}
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
-  bloom.setSize(innerWidth, innerHeight);
 });

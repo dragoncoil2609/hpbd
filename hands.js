@@ -21,6 +21,7 @@ export class HandController {
     this.landmarker = null;
     this.stream = null;
     this.lastTime = -1;
+    this.lastDetect = 0;
     this.lastSeen = 0;
     this.prev = null;
     this.candidate = 'none';
@@ -70,6 +71,9 @@ export class HandController {
     s.dx = s.dy = 0;
     const v = this.video;
     if (!this.running || v.readyState < 2 || v.currentTime === this.lastTime) return s;
+    // detection blocks the main thread for a few ms: ~25 Hz is plenty, the scene smooths in between
+    if (now - this.lastDetect < 38) return s;
+    this.lastDetect = now;
     this.lastTime = v.currentTime;
 
     const res = this.landmarker.detectForVideo(v, now);
