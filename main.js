@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import CONFIG from './config.js?v=6';
-import { HandController } from './hands.js?v=6';
-import { BirthdaySong } from './music.js?v=6';
+import CONFIG from './config.js?v=7';
+import { HandController } from './hands.js?v=7';
+import { BirthdaySong } from './music.js?v=7';
 
 const $ = (s) => document.querySelector(s);
 const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -57,11 +57,10 @@ controls.minDistance = 6;
 controls.maxDistance = 70;
 controls.rotateSpeed = 0.6;
 
-// MSAA only where pixels are big enough for jaggies to show
-const composer = new EffectComposer(
-  renderer,
-  new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: MAX_PR > 1.25 ? 0 : 4 })
-);
+// No MSAA render targets: the bloom pass blends back into the composer's buffer, and on some
+// desktop GPUs a multisampled buffer gets discarded after its resolve, which showed up as a
+// flickering blocky white blob over the core.
+const composer = new EffectComposer(renderer);
 composer.setSize(innerWidth, innerHeight);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.35, 0.9);
