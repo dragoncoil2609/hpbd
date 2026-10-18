@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import CONFIG from './config.js';
-import { HandController } from './hands.js';
-import { BirthdaySong } from './music.js';
+import CONFIG from './config.js?v=5';
+import { HandController } from './hands.js?v=5';
+import { BirthdaySong } from './music.js?v=5';
 
 const $ = (s) => document.querySelector(s);
 const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -37,11 +37,17 @@ renderer.setClearColor(0x000000);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x07040f);
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 1000);
-{
-  // portrait screens need to sit further back to fit the galaxy width
-  const fit = Math.pow(Math.max(1, (innerHeight / innerWidth) * 1.1), 0.85);
-  camera.position.set(0, 19, 22).multiplyScalar(fit);
+// Portrait phones: look down more steeply so the disk fills the tall screen (the arms may run
+// off the sides and sweep back in as it turns), and draw photos and wishes larger.
+const view = { portrait: false, photoScale: 1, wishScale: 1 };
+function fitView() {
+  const aspect = innerWidth / innerHeight;
+  view.portrait = aspect < 0.85;
+  view.photoScale = view.portrait ? 1.42 : 1;
+  view.wishScale = view.portrait ? 1.45 : 1;
+  return view.portrait ? new THREE.Vector3(0, 0.85, 0.53).multiplyScalar(52 - aspect * 10) : new THREE.Vector3(0, 19, 22);
 }
+camera.position.copy(fitView());
 
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
@@ -257,8 +263,12 @@ const galaxyMat = new THREE.ShaderMaterial({
       p.xz = mat2(c, -s, s, c) * p.xz;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       gl_Position = projectionMatrix * mv;
-      vTw = 0.65 + 0.35 * sin(uTime * (1.5 + aSeed * 2.0) + aSeed * 40.0);
-      gl_PointSize = min(aSize * uScale * vTw / -mv.z, 40.0 * uScale / 95.0);
+      // gentle, slow twinkle in brightness only: strong size/brightness swings made bloom pop on and off
+      vTw = 0.86 + 0.14 * sin(uTime * (0.5 + aSeed * 0.8) + aSeed * 40.0);
+      // points smaller than ~1.5px shimmer as they move: draw them at 1.5px and dim them instead
+      float size = aSize * uScale / -mv.z;
+      vTw *= clamp(size / 1.5, 0.15, 1.0);
+      gl_PointSize = clamp(size, 1.5, 40.0 * uScale / 95.0);
       vColor = aColor;
     }
   `,
@@ -269,7 +279,7 @@ const galaxyMat = new THREE.ShaderMaterial({
       float d = length(gl_PointCoord - 0.5);
       float a = smoothstep(0.5, 0.0, d);
       a *= a;
-      gl_FragColor = vec4(vColor * a * 1.7 * vTw, a);
+      gl_FragColor = vec4(vColor * a * 1.6 * vTw, a);
     }
   `,
 });
@@ -457,6 +467,8 @@ const hands = new HandController($('#cam'), $('#cam-overlay'));
 $('#intro-title').textContent = CONFIG.title;
 $('#intro-sub').textContent = CONFIG.subtitle;
 $('#hud-title span').textContent = CONFIG.title;
+if (matchMedia('(pointer: coarse)').matches) $('#btn-start-touch').textContent = '✨ Dùng cảm ứng';
+else $('#btn-start-touch').textContent = '✨ Dùng chuột';
 document.title = CONFIG.title;
 
 const toastEl = $('#toast');
@@ -476,20 +488,23 @@ function setExpand(v) {
 
 // music: "builtin" = the synthesized birthday song, a path = an audio file, "" = silence
 function filePlayer(src, startAt = 0) {
-  const a = new Audio(src);
-  a.loop = true;
-  a.volume = 0.6;
-  a.preload = 'auto';
-  a.onerror = () => {
-    // missing file: hide the button rather than show one that does nothing
-    console.warn('Không tải được nhạc:', src);
-    $('#btn-music').classList.add('hidden');
+  let a;
+  let retries = 0;
+  const make = (url) => {
+    a = new Audio(url);
+    a.loop = true;
+    a.volume = 0.7;
+    a.preload = 'auto';
+    a.addEventListener('playing', () => $('#btn-music').classList.add('active'));
+    a.addEventListener('pause', () => $('#btn-music').classList.remove('active'));
+    a.addEventListener('error', () => console.warn('Không tải được nhạc:', url));
+    if (startAt) a.addEventListener('loadedmetadata', () => (a.currentTime = startAt), { once: true });
   };
-  let first = true;
+  make(src);
   return {
     play() {
-      if (first && startAt) a.currentTime = startAt;
-      first = false;
+      // a load that failed earlier (e.g. a 404 the browser cached) gets a fresh, uncached retry
+      if (a.error && retries++ < 2) make(`${src}${src.includes('?') ? '&' : '?'}r=${Date.now()}`);
       return a.play();
     },
     pause: () => a.pause(),
@@ -497,16 +512,33 @@ function filePlayer(src, startAt = 0) {
   };
 }
 const music = CONFIG.music === 'builtin' ? new BirthdaySong() : CONFIG.music ? filePlayer(CONFIG.music, CONFIG.musicStart) : null;
+let musicWanted = false;
+let musicRetryArmed = false;
 function playMusic() {
-  // called inside a click handler, which browsers require before audio may start
+  // must run inside a tap/click: browsers only allow sound to start from a user gesture
+  musicWanted = true;
   Promise.resolve(music.play())
     .then(() => $('#btn-music').classList.add('active'))
-    .catch(() => $('#btn-music').classList.remove('active'));
+    .catch((err) => {
+      console.warn('Chưa phát được nhạc:', err);
+      $('#btn-music').classList.remove('active');
+      if (musicRetryArmed) return;
+      // blocked or not loaded yet: the next tap anywhere tries again
+      musicRetryArmed = true;
+      toast('🎵 Chạm vào màn hình để bật nhạc', true, 4000);
+      const retry = () => {
+        musicRetryArmed = false;
+        removeEventListener('pointerdown', retry, true);
+        if (musicWanted && !music.playing) playMusic();
+      };
+      addEventListener('pointerdown', retry, true);
+    });
 }
 if (music) {
   $('#btn-music').classList.remove('hidden');
   $('#btn-music').onclick = () => {
     if (music.playing) {
+      musicWanted = false;
       music.pause();
       $('#btn-music').classList.remove('active');
     } else playMusic();
@@ -537,6 +569,8 @@ async function startHands() {
   $('#btn-cam').classList.add('active');
   try {
     await hands.start();
+    // some phones pause page audio when the camera opens: pick the song back up
+    if (musicWanted && !music.playing) Promise.resolve(music.play()).catch(() => {});
     $('#gesture-label').textContent = 'Đưa tay vào khung hình';
     toast('🖐 Xoè tay để bung thiên hà, ✊ nắm tay để thu lại', true, 4500);
   } catch (err) {
@@ -730,7 +764,7 @@ function tick() {
   }
 
   // core
-  const pulse = 1 + Math.sin(t * 2) * 0.04;
+  const pulse = 1 + Math.sin(t * 1.1) * 0.025;
   orb.scale.setScalar((1 - e * 0.35) * pulse);
   glowBig.scale.setScalar((9 + e * 5) * pulse);
   glowSmall.scale.setScalar(2.4 + e * 1.2);
@@ -745,7 +779,7 @@ function tick() {
     p.position.copy(tmpV);
     p.quaternion.copy(invQ);
     u.hover = damp(u.hover, p === hovered ? 1 : 0, 10, dt);
-    const sc = (1.9 + e * 0.7) * (1 + u.hover * 0.3);
+    const sc = (1.9 + e * 0.7) * (1 + u.hover * 0.3) * view.photoScale;
     p.scale.set(sc * u.sx, sc * u.sy, 1);
   }
   for (const s of wishSprites) {
@@ -753,9 +787,9 @@ function tick() {
     tmpV.lerpVectors(u.compact, u.galaxy, e);
     tmpV.y += Math.sin(t * 0.6 + u.seed) * 0.3;
     s.position.copy(tmpV);
-    const k = 1 + e * 0.35;
+    const k = (1 + e * 0.35) * view.wishScale;
     s.scale.set(u.w * k, u.h * k, 1);
-    s.material.opacity = 0.75 + 0.25 * Math.sin(t * 1.2 + u.seed);
+    s.material.opacity = 0.9 + 0.1 * Math.sin(t * 0.7 + u.seed);
   }
 
   stars.rotation.y += dt * 0.004;
@@ -768,17 +802,22 @@ function tick() {
 requestAnimationFrame(tick);
 
 // Drop the render resolution step by step while the GPU can't hold ~50 fps.
-const perf = { last: 0, frames: 0, slow: 0, since: performance.now() + 3000 };
+// Each resolution change re-creates the render targets and shows as a flash, so this
+// steps down at most once, straight to 1x, and only after two slow windows in a row.
+const perf = { last: 0, frames: 0, slow: 0, strikes: 0, done: false, since: performance.now() + 3000 };
 function adaptQuality(now) {
   const ft = now - perf.last;
   perf.last = now;
-  if (now < perf.since || ft > 200 || document.hidden) return; // startup, tab switches
+  if (perf.done || now < perf.since || ft > 200 || document.hidden) return; // startup, tab switches
   perf.frames++;
-  if (ft > 20) perf.slow++;
-  if (perf.frames < 90) return;
-  const pr = renderer.getPixelRatio();
-  if (perf.slow / perf.frames > 0.25 && pr > 1) setPixelRatio(Math.max(1, pr - 0.25));
+  if (ft > 22) perf.slow++;
+  if (perf.frames < 120) return;
+  perf.strikes = perf.slow / perf.frames > 0.3 ? perf.strikes + 1 : 0;
   perf.frames = perf.slow = 0;
+  if (perf.strikes >= 2 && renderer.getPixelRatio() > 1) {
+    setPixelRatio(1);
+    perf.done = true;
+  }
 }
 function setPixelRatio(pr) {
   renderer.setPixelRatio(pr);
@@ -787,9 +826,21 @@ function setPixelRatio(pr) {
   perf.since = performance.now() + 1500; // let the new size settle before judging again
 }
 
+// phones fire bursts of resize events (address bar, rotation): resize once they settle
+let resizeTimer;
+const lastSize = { w: innerWidth, h: innerHeight };
 addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const w = innerWidth, h = innerHeight;
+    if (w === lastSize.w && h === lastSize.h) return;
+    Object.assign(lastSize, { w, h });
+    const wasPortrait = view.portrait;
+    const pos = fitView();
+    if (view.portrait !== wasPortrait) camera.position.copy(pos); // phone rotated: reframe
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    renderer.setSize(w, h);
+    composer.setSize(w, h);
+  }, 150);
 });

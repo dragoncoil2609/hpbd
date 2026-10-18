@@ -19,7 +19,10 @@ html, body {
   color: var(--text);
   font-family: "Be Vietnam Pro", system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
   user-select: none;
+  overscroll-behavior: none; /* no pull-to-refresh while dragging the galaxy */
+  -webkit-touch-callout: none;
 }
 
 #scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
@@ -32,7 +35,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .overlay {
   position: fixed; inset: 0; z-index: 20;
   display: grid; place-items: center; padding: 16px;
-  background: radial-gradient(ellipse at center, rgba(30, 8, 40, 0.6), rgba(5, 3, 12, 0.9));
+  background: radial-gradient(ellipse at center, rgba(20, 6, 30, 0.78), rgba(5, 3, 12, 0.92));
   /* no backdrop-filter: blurring a live WebGL canvas costs a full-screen pass every frame */
   transition: opacity 0.8s ease;
 }
@@ -172,7 +175,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @keyframes pop { from { transform: scale(0.7); opacity: 0; } }
 
 @media (max-width: 600px) {
-  #cam-box { width: 120px; top: auto; bottom: 76px; right: 12px; }
-  #hud-title { top: 12px; }
-  .chip { padding: 9px 13px; font-size: 13px; }
+  #cam-box { width: 112px; top: auto; bottom: calc(max(16px, env(safe-area-inset-bottom)) + 60px); right: 12px; }
+  #hud-title { top: max(12px, env(safe-area-inset-top)); }
+  #controls { gap: 6px; }
+  .chip { padding: 10px 13px; font-size: 13px; min-height: 42px; }
+  #toast { bottom: calc(max(16px, env(safe-area-inset-bottom)) + 64px); }
+  .modal-card { padding: 10px 10px 14px; }
+  #modal-img { max-height: 56vh; }
 }
