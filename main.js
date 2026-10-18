@@ -4,9 +4,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import CONFIG from './config.js?v=5';
-import { HandController } from './hands.js?v=5';
-import { BirthdaySong } from './music.js?v=5';
+import CONFIG from './config.js?v=6';
+import { HandController } from './hands.js?v=6';
+import { BirthdaySong } from './music.js?v=6';
 
 const $ = (s) => document.querySelector(s);
 const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
@@ -464,12 +464,12 @@ const state = {
 const hands = new HandController($('#cam'), $('#cam-overlay'));
 
 // ---------------------------------------------------------------- UI
-$('#intro-title').textContent = CONFIG.title;
+$('#intro-title .title-text').textContent = CONFIG.title;
 $('#intro-sub').textContent = CONFIG.subtitle;
-$('#hud-title span').textContent = CONFIG.title;
+$('#hud-title .title-text').textContent = CONFIG.title;
 if (matchMedia('(pointer: coarse)').matches) $('#btn-start-touch').textContent = '✨ Dùng cảm ứng';
 else $('#btn-start-touch').textContent = '✨ Dùng chuột';
-document.title = CONFIG.title;
+document.title = `${CONFIG.title} ♥`;
 
 const toastEl = $('#toast');
 let toastTimer;

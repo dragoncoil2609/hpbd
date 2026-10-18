@@ -3,7 +3,7 @@
 // ==========================================================
 export default {
   // Tiêu đề hiện ở màn hình mở đầu và góc trên
-  title: "Stellar Bloom",
+  title: "Yêu em",
   subtitle: "Gửi những điều dịu dàng nhất đến em ♡",
 
   // Danh sách ảnh. Bỏ ảnh vào thư mục images/ rồi ghi tên file vào đây, ví dụ:

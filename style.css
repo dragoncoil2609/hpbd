@@ -57,10 +57,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 #intro-title {
   font-family: "Dancing Script", cursive; font-weight: 700;
-  font-size: clamp(44px, 12vw, 72px); margin: 0;
+  font-size: clamp(48px, 14vw, 80px); margin: 0; line-height: 1.15;
+}
+#intro-title .title-text {
   background: linear-gradient(90deg, #ffd1e8, #ff7ac8, #c9a8ff);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 0 18px rgba(255, 100, 180, 0.5));
+  padding: 0 0.06em; /* keep the script swashes inside the clipped box */
+}
+
+/* beating heart beside the title */
+.heart {
+  display: inline-block; width: 0.78em; height: 0.78em; margin-left: 0.22em; vertical-align: -0.06em;
+  fill: #ff4d8d; overflow: visible;
+  filter: drop-shadow(0 0 10px rgba(255, 77, 141, 0.85));
+  transform-origin: 50% 60%;
+  animation: heartbeat 1.3s ease-in-out infinite;
+}
+@keyframes heartbeat {
+  0%, 40%, 100% { transform: scale(1); }
+  12% { transform: scale(1.2); }
+  24% { transform: scale(1.04); }
+  32% { transform: scale(1.14); }
 }
 #intro-sub { color: var(--muted); margin: 6px 0 26px; font-size: 16px; }
 
