@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="theme-color" content="#07040f" />
+  <title>Stellar Bloom</title>
+  <meta name="description" content="Thiên hà kỷ niệm với những bức ảnh và lời chúc, điều khiển bằng cử chỉ tay." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="intro" class="overlay">
+    <div class="intro-card">
+      <div class="intro-orb"></div>
+      <h1 id="intro-title">Stellar Bloom</h1>
+      <p id="intro-sub"></p>
+      <div class="intro-actions">
+        <button id="btn-start-hand" class="btn primary">🖐 Điều khiển bằng tay</button>
+        <button id="btn-start-touch" class="btn">✨ Dùng chuột / cảm ứng</button>
+      </div>
+      <p class="hint">Cử chỉ tay cần quyền camera. Hình ảnh chỉ được xử lý ngay trên máy của bạn.</p>
+    </div>
+  </div>
+
+  <header id="hud-title" class="hidden"><span></span></header>
+
+  <nav id="controls" class="hidden">
+    <button id="btn-toggle" class="chip">🌌 Bung thiên hà</button>
+    <button id="btn-cam" class="chip">🖐 Cử chỉ tay</button>
+    <button id="btn-music" class="chip hidden" aria-label="Nhạc">🎵</button>
+    <button id="btn-help" class="chip" aria-label="Hướng dẫn">?</button>
+  </nav>
+
+  <div id="cam-box" class="hidden">
+    <video id="cam" playsinline muted></video>
+    <canvas id="cam-overlay"></canvas>
+    <div id="gesture-label">Đang tải mô hình…</div>
+  </div>
+
+  <aside id="help" class="panel hidden">
+    <h3>Cử chỉ tay</h3>
+    <ul>
+      <li><b>🖐 Xoè tay</b> bung ra thành thiên hà</li>
+      <li><b>✊ Nắm tay</b> thu lại thành quả cầu</li>
+      <li><b>↔ Di chuyển tay</b> xoay thiên hà</li>
+      <li><b>↕ Đưa tay lại gần / ra xa</b> phóng to / thu nhỏ</li>
+      <li><b>☝️ Chỉ tay vào ảnh và giữ</b> mở ảnh</li>
+      <li><b>✌️ Giơ hai ngón</b> nhận một lời chúc</li>
+    </ul>
+    <h3>Chuột / cảm ứng</h3>
+    <ul>
+      <li>Kéo để xoay, cuộn hoặc chụm 2 ngón để thu phóng</li>
+      <li>Nhấp đúp để bung / thu thiên hà</li>
+      <li>Chạm vào ảnh để xem lời chúc</li>
+    </ul>
+    <button class="btn small" id="btn-help-close">Đã hiểu</button>
+  </aside>
+
+  <div id="finger" class="hidden"></div>
+  <div id="toast"></div>
+
+  <div id="modal" class="hidden">
+    <div class="modal-card">
+      <button class="modal-close" aria-label="Đóng">×</button>
+      <img id="modal-img" alt="" />
+      <p id="modal-wish"></p>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
